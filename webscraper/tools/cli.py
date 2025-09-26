@@ -1,4 +1,5 @@
 """Defines the CLI for Truthbrush."""
+"""Citation: https://github.com/stanfordio/truthbrush/blob/main/truthbrush/cli.py"""
 
 import json
 import click
