@@ -162,7 +162,6 @@ class Api:
             return
         post = post.split("/")[-1]
         n_output = 0
-        yield post
         for followers_batch in self._get_paginated(
             f"/v1/statuses/{post}/favourited_by", resume=None, params=dict(limit=80)
         ):
