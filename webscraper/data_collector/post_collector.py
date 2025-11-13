@@ -30,7 +30,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from tools.api import Api  # Now this import should work
 
 
-def collect_posts(num_posts=1000, max_likes_per_post=5000, max_comments_per_post=500, output_file='trump_posts_data.csv', username='realDonaldTrump'):
+def collect_posts(num_posts=1000, max_likes_per_post=500, max_comments_per_post=50, output_file='trump_posts_data.csv', username='realDonaldTrump'):
     """
     Collect posts and interactions
     
@@ -154,9 +154,9 @@ def main():
     parser = argparse.ArgumentParser(description='Collect posts and interactions from Truth Social')
     parser.add_argument('--num_posts', type=int, default=1000,
                        help='Number of posts to collect (default: 1000)')
-    parser.add_argument('--max_likes', type=int, default=5000,
+    parser.add_argument('--max_likes', type=int, default=500,
                        help='Maximum likes per post to collect (default: 5000)')
-    parser.add_argument('--max_comments', type=int, default=500,
+    parser.add_argument('--max_comments', type=int, default=50,
                        help='Maximum comments per post to collect (default: 500)')
     parser.add_argument('--output', type=str, default='trump_posts_data.csv',
                        help='Output CSV file path')
