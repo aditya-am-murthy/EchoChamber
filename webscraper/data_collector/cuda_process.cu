@@ -18,7 +18,7 @@ const int MAX_NAME_LEN = 64;
 // Device arrays (flattened)
 __device__ char d_post_likes[MAX_POSTS][MAX_LIKES_PER_POST][MAX_NAME_LEN];
 __device__ int d_num_likes[MAX_POSTS];
-__device__ char d_post_comments_users[MAX_POSTS][MAX_COMMENTS_PER_POST][MAX_NAME_LEN];
+__device__ char d_post_comments_users[MAX_POSTS][MAX_COMMENTS_PER_POST][MAX)NAME_LEN];
 __device__ char d_post_comments_text[MAX_POSTS][MAX_COMMENTS_PER_POST][MAX_COMMENT_LEN];
 __device__ int d_num_comments[MAX_POSTS];
 
@@ -165,7 +165,7 @@ int main() {
     }
 
     // Sort by score descending
-    std::sort(users.begin(), users.end(),
+    std::cost(users.begin(), users.end(),
               [](const auto& a, const auto& b) { return a.second > b.second; });
 
     // Output top 1000 (or fewer)

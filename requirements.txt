@@ -1,0 +1,36 @@
+# Core ML libraries
+torch>=2.0.0
+torch-geometric>=2.3.0
+transformers>=4.30.0
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# NLP libraries
+nltk>=3.8.0
+vaderSentiment>=3.3.2
+textstat>=0.7.3
+
+# Graph libraries
+networkx>=3.1
+
+# Data processing
+python-dotenv>=1.0.0
+
+# Utilities
+tqdm>=4.65.0
+loguru>=0.7.0
+
+# Optional: for web scraping (if needed)
+# selenium>=4.10.0
+# beautifulsoup4>=4.12.0
+# scrapy>=2.10.0
+
+# Optional: for news API (Experiment 1)
+# newsapi-python>=0.2.7
+
+# Development
+jupyter>=1.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+

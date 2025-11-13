@@ -108,7 +108,7 @@ class Api:
                     "User-Agent": USER_AGENT,
                 },
             )
-        except curl_cffi.curl.CurlError as e:
+        except Exception as e:  # curl_cffi.curl.CurlError
             logger.error(f"Curl error: {e}")
 
         # Will also sleep

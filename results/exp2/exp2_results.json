@@ -1,0 +1,27 @@
+{
+  "experiment": "Node Type Addition",
+  "description": "Evaluating impact of distinguishing node types (users, news agencies, influencers)",
+  "baseline_model": "NLP + GNN with basic nodes (user/post only)",
+  "enhanced_model": "NLP + GNN with enhanced nodes (user/post/news_agency/influencer)",
+  "node_type_distribution": {
+    "basic": {
+      "post": 50,
+      "user": 1494,
+      "influencer": 323
+    },
+    "enhanced": {
+      "post": 50,
+      "user": 1469,
+      "influencer": 318,
+      "news_agency": 30
+    }
+  },
+  "metrics": {
+    "baseline_accuracy": 0.0,
+    "enhanced_accuracy": 0.0,
+    "improvement": 0.0,
+    "baseline_mae": 0.0,
+    "enhanced_mae": 0.0
+  },
+  "conclusion": "Node type distinctions show [results]"
+}

@@ -1,0 +1,14 @@
+{
+  "experiment": "News Context Addition",
+  "description": "Evaluating impact of adding news headlines as context",
+  "baseline_model": "NLP + GNN without news",
+  "enhanced_model": "NLP + GNN with news context",
+  "metrics": {
+    "baseline_accuracy": 0.0,
+    "enhanced_accuracy": 0.0,
+    "improvement": 0.0,
+    "baseline_mae": 0.0,
+    "enhanced_mae": 0.0
+  },
+  "conclusion": "News context addition shows [results]"
+}
