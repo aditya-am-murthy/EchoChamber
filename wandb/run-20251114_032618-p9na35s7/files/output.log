@@ -1,0 +1,15 @@
+Wandb initialized in online mode. View dashboard at wandb.ai
+Backed up existing file to trump_posts_data.csv.backup
+Starting collection of 1000 posts from @realDonaldTrump...
+Max likes per post: 5000, Max comments per post: 750
+Collecting posts: 100%|█| 1000/1000 [10:59:36<00:00, 39.58s/post, Likes=20, Comm
+  Warning: Error fetching comments for post 115436250208272425: Failed to perform, curl: (28) Operation timed out after 30003 milliseconds with 0 bytes received. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
+
+Collection complete!
+  Total posts collected: 1000
+  Total likes collected: 18956
+  Total comments collected: 584223
+  Errors encountered: 0
+  Time elapsed: 659.61 minutes
+  Average rate: 0.03 posts/second
+  Output file: trump_posts_data.csv

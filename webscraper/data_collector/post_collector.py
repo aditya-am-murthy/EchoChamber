@@ -8,6 +8,18 @@ import logging
 from datetime import datetime
 import time
 from tqdm import tqdm
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Try to import wandb, but continue if it's not available
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+    wandb = None
 
 #idea is to take the N most recent posts from donald trump and build a CSV containing all the people that have liked the post as well as commented
 
@@ -41,6 +53,71 @@ def collect_posts(num_posts=1000, max_likes_per_post=500, max_comments_per_post=
         output_file: Output CSV file path
         username: Username to collect posts from
     """
+    # Initialize wandb (use offline mode if not authenticated)
+    wandb_initialized = False
+    if WANDB_AVAILABLE:
+        # Import wandb locally to avoid scoping issues
+        try:
+            import wandb as wandb_module
+            if wandb_module is not None:
+                try:
+                    # Check if wandb is authenticated by trying to access the API key
+                    api_key = os.getenv('WANDB_API_KEY')
+                    if not api_key:
+                        # Try to get from wandb settings
+                        try:
+                            import wandb.settings
+                            settings = wandb.settings.Settings()
+                            api_key = settings.get('api_key')
+                        except Exception:
+                            pass
+                    
+                    if api_key:
+                        wandb_module.init(
+                            project="truthsocial-scraper",
+                            entity="aditya-murthy-ucla",
+                            name=f"scrape_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                            config={
+                                "num_posts": num_posts,
+                                "max_likes_per_post": max_likes_per_post,
+                                "max_comments_per_post": max_comments_per_post,
+                                "username": username,
+                                "output_file": output_file
+                            }
+                        )
+                        print("Wandb initialized in online mode. View dashboard at wandb.ai")
+                        wandb_initialized = True
+                    else:
+                        # Fallback to offline mode
+                        wandb_module.init(
+                            project="truthsocial-scraper",
+                            entity="aditya-murthy-ucla",
+                            name=f"scrape_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                            mode="offline",
+                            config={
+                                "num_posts": num_posts,
+                                "max_likes_per_post": max_likes_per_post,
+                                "max_comments_per_post": max_comments_per_post,
+                                "username": username,
+                                "output_file": output_file
+                            }
+                        )
+                        print("Wandb initialized in offline mode. Run 'wandb sync' later to upload logs.")
+                        wandb_initialized = True
+                except Exception as e:
+                    print(f"Warning: Could not initialize wandb: {e}")
+                    print("Continuing without wandb logging...")
+                    wandb_initialized = False
+            else:
+                print("Wandb module is None. Continuing without wandb logging...")
+                wandb_initialized = False
+        except ImportError:
+            print("Wandb import failed. Continuing without wandb logging...")
+            wandb_initialized = False
+    else:
+        print("Wandb not available. Continuing without wandb logging...")
+        wandb_initialized = False
+    
     api = Api()
     
     # Backup existing file if it exists
@@ -57,6 +134,8 @@ def collect_posts(num_posts=1000, max_likes_per_post=500, max_comments_per_post=
 
         count = 0
         errors = 0
+        total_likes = 0
+        total_comments = 0
         start_time = time.time()
         
         print(f"Starting collection of {num_posts} posts from @{username}...")
@@ -75,12 +154,19 @@ def collect_posts(num_posts=1000, max_likes_per_post=500, max_comments_per_post=
                     
                     # Fetch liking usernames
                     likes = []
+                    users_processed = 0
                     try:
                         for user in api.user_likes(post_id, include_all=False, top_num=max_likes_per_post):
+                            users_processed += 1
                             if 'username' in user:
                                 likes.append(user['username'])
+                            elif 'acct' in user:  # Alternative field name
+                                likes.append(user['acct'])
                             if len(likes) >= max_likes_per_post:
                                 break
+                        # Debug: log if we got fewer likes than expected
+                        if users_processed > 0 and len(likes) < users_processed * 0.5:
+                            pbar.write(f"  Note: Post {post_id} - processed {users_processed} users, got {len(likes)} usernames")
                     except Exception as e:
                         pbar.write(f"  Warning: Error fetching likes for post {post_id}: {e}")
                     
@@ -109,8 +195,28 @@ def collect_posts(num_posts=1000, max_likes_per_post=500, max_comments_per_post=
                     f.flush()  # Ensure data is written immediately
 
                     count += 1
+                    total_likes += len(likes)
+                    total_comments += len(comments)
                     elapsed = time.time() - start_time
                     rate = count / elapsed if elapsed > 0 else 0
+                    
+                    # Log metrics to wandb
+                    if wandb_initialized:
+                        try:
+                            import wandb as wandb_module
+                            wandb_module.log({
+                                "posts_collected": count,
+                                "total_likes": total_likes,
+                                "total_comments": total_comments,
+                                "avg_likes_per_post": total_likes / count if count > 0 else 0,
+                                "avg_comments_per_post": total_comments / count if count > 0 else 0,
+                                "errors": errors,
+                                "rate_posts_per_sec": rate,
+                                "elapsed_time_minutes": elapsed / 60,
+                                "progress_percent": (count / num_posts) * 100
+                            })
+                        except Exception:
+                            pass
                     
                     # Update progress bar
                     pbar.set_postfix({
@@ -144,19 +250,37 @@ def collect_posts(num_posts=1000, max_likes_per_post=500, max_comments_per_post=
         elapsed = time.time() - start_time
         print(f"\nCollection complete!")
         print(f"  Total posts collected: {count}")
+        print(f"  Total likes collected: {total_likes}")
+        print(f"  Total comments collected: {total_comments}")
         print(f"  Errors encountered: {errors}")
         print(f"  Time elapsed: {elapsed/60:.2f} minutes")
         print(f"  Average rate: {count/elapsed:.2f} posts/second" if elapsed > 0 else "")
         print(f"  Output file: {output_file}")
+        
+        # Log final summary to wandb
+        if wandb_initialized:
+            try:
+                import wandb as wandb_module
+                wandb_module.log({
+                    "final_posts_collected": count,
+                    "final_total_likes": total_likes,
+                    "final_total_comments": total_comments,
+                    "final_errors": errors,
+                    "final_elapsed_time_minutes": elapsed / 60,
+                    "final_rate_posts_per_sec": count / elapsed if elapsed > 0 else 0
+                })
+                wandb_module.finish()
+            except Exception:
+                pass
 
 
 def main():
     parser = argparse.ArgumentParser(description='Collect posts and interactions from Truth Social')
     parser.add_argument('--num_posts', type=int, default=1000,
                        help='Number of posts to collect (default: 1000)')
-    parser.add_argument('--max_likes', type=int, default=500,
+    parser.add_argument('--max_likes', type=int, default=5000,
                        help='Maximum likes per post to collect (default: 5000)')
-    parser.add_argument('--max_comments', type=int, default=50,
+    parser.add_argument('--max_comments', type=int, default=1000,
                        help='Maximum comments per post to collect (default: 500)')
     parser.add_argument('--output', type=str, default='trump_posts_data.csv',
                        help='Output CSV file path')

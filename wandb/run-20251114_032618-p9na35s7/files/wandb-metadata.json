@@ -1,0 +1,37 @@
+{
+  "os": "Linux-6.8.0-55-generic-x86_64-with-glibc2.39",
+  "python": "CPython 3.12.8",
+  "startedAt": "2025-11-14T03:26:18.994999Z",
+  "args": [
+    "--max_likes",
+    "5000",
+    "--max_comments",
+    "750"
+  ],
+  "program": "/home/aditya/EchoChamber/webscraper/data_collector/post_collector.py",
+  "codePath": "webscraper/data_collector/post_collector.py",
+  "git": {
+    "remote": "https://github.com/aditya-am-murthy/EchoChamber",
+    "commit": "71d365b3a13196aaeb130ccfca1b97430db92db6"
+  },
+  "email": "aditya.am.murthy@gmail.com",
+  "root": "/home/aditya/EchoChamber",
+  "host": "serrano",
+  "executable": "/home/aditya/miniconda3/bin/python3",
+  "codePathLocal": "webscraper/data_collector/post_collector.py",
+  "cpu_count": 24,
+  "cpu_count_logical": 48,
+  "disk": {
+    "/": {
+      "total": "1966736678912",
+      "used": "311142129664"
+    }
+  },
+  "memory": {
+    "total": "33502593024"
+  },
+  "cpu": {
+    "count": 24,
+    "countLogical": 48
+  }
+}

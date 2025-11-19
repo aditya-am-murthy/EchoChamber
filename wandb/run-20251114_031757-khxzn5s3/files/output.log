@@ -1,0 +1,16 @@
+Wandb initialized in online mode. View dashboard at wandb.ai
+Backed up existing file to trump_posts_data.csv.backup
+Starting collection of 1000 posts from @realDonaldTrump...
+Max likes per post: 1000, Max comments per post: 500
+Collecting posts:   1%|▍                                     | 13/1000 [04:54<6:12:30, 22.65s/post, Likes=20, Comments=500, Rate=0.06/s, Errors=0]
+
+Collection interrupted by user. Collected 13 posts.
+
+Collection complete!
+  Total posts collected: 13
+  Total likes collected: 260
+  Total comments collected: 6458
+  Errors encountered: 0
+  Time elapsed: 4.91 minutes
+  Average rate: 0.04 posts/second
+  Output file: trump_posts_data.csv

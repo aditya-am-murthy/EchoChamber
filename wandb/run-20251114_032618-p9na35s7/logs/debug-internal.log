@@ -1,0 +1,16 @@
+{"time":"2025-11-14T03:26:19.003748782Z","level":"INFO","msg":"stream: starting","core version":"0.19.11","symlink path":"/home/aditya/EchoChamber/wandb/run-20251114_032618-p9na35s7/logs/debug-core.log"}
+{"time":"2025-11-14T03:26:19.908580153Z","level":"INFO","msg":"created new stream","id":"p9na35s7"}
+{"time":"2025-11-14T03:26:19.908644473Z","level":"INFO","msg":"stream: started","id":"p9na35s7"}
+{"time":"2025-11-14T03:26:19.908684343Z","level":"INFO","msg":"writer: Do: started","stream_id":"p9na35s7"}
+{"time":"2025-11-14T03:26:19.908761463Z","level":"INFO","msg":"handler: started","stream_id":"p9na35s7"}
+{"time":"2025-11-14T03:26:19.908843723Z","level":"INFO","msg":"sender: started","stream_id":"p9na35s7"}
+{"time":"2025-11-14T03:26:20.221738664Z","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-11-14T14:25:57.646004793Z","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-11-14T14:25:57.646487292Z","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-11-14T14:25:58.231908991Z","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-11-14T14:25:58.541077157Z","level":"INFO","msg":"handler: operation stats","stats":{}}
+{"time":"2025-11-14T14:25:58.571543862Z","level":"INFO","msg":"stream: closing","id":"p9na35s7"}
+{"time":"2025-11-14T14:25:58.571580852Z","level":"INFO","msg":"handler: closed","stream_id":"p9na35s7"}
+{"time":"2025-11-14T14:25:58.571597612Z","level":"INFO","msg":"writer: Close: closed","stream_id":"p9na35s7"}
+{"time":"2025-11-14T14:25:58.571644682Z","level":"INFO","msg":"sender: closed","stream_id":"p9na35s7"}
+{"time":"2025-11-14T14:25:58.576324213Z","level":"INFO","msg":"stream: closed","id":"p9na35s7"}
