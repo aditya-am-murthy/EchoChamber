@@ -7,9 +7,10 @@ import torch.nn as nn
 import numpy as np
 from typing import Dict, Optional, Tuple
 from torch_geometric.data import Data
+from torch_geometric.data import HeteroData
 
 from .nlp.text_processor import TextProcessor
-from .gnn.gnn_model import GNNModel, GNNConfig
+from .gnn import GNNModel, GNNConfig, HeteroGNNModel, HeteroGNNConfig
 from .graph.graph_builder import GraphBuilder
 
 
@@ -33,7 +34,8 @@ class IntegratedNLPGNNModel(nn.Module):
         dropout: float = 0.3,
         include_news_context: bool = False,
         news_context_dim: int = 0,
-        device: str = None
+        device: str = None,
+        use_hetero_gnn: bool = False,
     ):
         """
         Initialize integrated model
@@ -48,11 +50,14 @@ class IntegratedNLPGNNModel(nn.Module):
             include_news_context: Whether to include news headlines (Experiment 1)
             news_context_dim: Dimension of news context features
             device: Device to run on
+            use_hetero_gnn: Whether to use heterogeneous HeteroGNNModel (True)
+                            or legacy homogeneous GNNModel (False, default)
         """
         super(IntegratedNLPGNNModel, self).__init__()
         
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.include_news_context = include_news_context
+        self.use_hetero_gnn = use_hetero_gnn
         
         # NLP module (frozen during training, used for feature extraction)
         self.text_processor = TextProcessor(nlp_model_name, device=self.device)
@@ -63,18 +68,32 @@ class IntegratedNLPGNNModel(nn.Module):
         nlp_total_dim = nlp_feature_dim + 11 + 4 + 3  # embeddings + linguistic (11) + sentiment + topic
         self.nlp_total_dim = nlp_total_dim
         
-        # GNN config
+        # GNN configs
         if gnn_config is None:
             gnn_config = GNNConfig(
                 input_dim=7,  # Node features: 6 node types + 1 interaction count
                 hidden_dim=256,
                 num_layers=3,
                 output_dim=gnn_output_dim,
-                dropout=dropout
+                dropout=dropout,
             )
-        
-        # GNN module
-        self.gnn = GNNModel(gnn_config).to(self.device)
+
+        self.gnn_config = gnn_config
+        self.gnn_output_dim = gnn_output_dim
+
+        # Legacy homogeneous GNN module
+        self.gnn = None
+        if not self.use_hetero_gnn:
+            self.gnn = GNNModel(self.gnn_config).to(self.device)
+
+        # Heterogeneous GNN module (lazy init once metadata is known)
+        self.hetero_gnn: Optional[HeteroGNNModel] = None
+        self.hetero_gnn_config = HeteroGNNConfig(
+            hidden_dim=256,
+            num_layers=3,
+            output_dim=gnn_output_dim,
+            dropout=dropout,
+        )
         
         # Feature fusion
         fusion_input_dim = nlp_total_dim + gnn_output_dim
@@ -116,15 +135,16 @@ class IntegratedNLPGNNModel(nn.Module):
     def forward(
         self,
         text: str,
-        graph: Data,
-        news_context: Optional[torch.Tensor] = None
+        graph,
+        news_context: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Forward pass
         
         Args:
             text: Post text
-            graph: PyTorch Geometric graph
+            graph: PyTorch Geometric graph (Data or HeteroData,
+                   depending on use_hetero_gnn flag)
             news_context: Optional news headline features (Experiment 1)
         
         Returns:
@@ -135,29 +155,74 @@ class IntegratedNLPGNNModel(nn.Module):
         
         # GNN forward pass
         graph = graph.to(self.device)
-        # Ensure graph.x has the correct dimension
-        # Clone to avoid modifying the original graph
-        graph_x = graph.x.clone()
-        if graph_x.shape[1] != self.gnn.config.input_dim:
-            # If dimension mismatch, create a projection layer
-            if not hasattr(self, 'node_feature_proj'):
-                self.node_feature_proj = nn.Linear(graph_x.shape[1], self.gnn.config.input_dim).to(self.device)
-            graph_x = self.node_feature_proj(graph_x)
-        
-        gnn_features = self.gnn(graph_x, graph.edge_index)
+
+        if not self.use_hetero_gnn:
+            # Legacy homogeneous graph path
+            graph_x = graph.x.clone()
+            if graph_x.shape[1] != self.gnn_config.input_dim:
+                if not hasattr(self, "node_feature_proj"):
+                    self.node_feature_proj = nn.Linear(
+                        graph_x.shape[1], self.gnn_config.input_dim
+                    ).to(self.device)
+                graph_x = self.node_feature_proj(graph_x)
+
+            gnn_features_vec = self.gnn(graph_x, graph.edge_index)
+        else:
+            # Heterogeneous graph path
+            assert isinstance(
+                graph, HeteroData
+            ), "use_hetero_gnn=True requires a HeteroData graph."
+
+            # Lazily initialize hetero GNN once metadata is known
+            if self.hetero_gnn is None:
+                metadata = graph.metadata()
+                self.hetero_gnn = HeteroGNNModel(
+                    self.hetero_gnn_config, metadata
+                ).to(self.device)
+
+            # Build edge_index_dict and edge_attr_dict
+            edge_index_dict = graph.edge_index_dict
+            edge_attr_dict: Dict[Tuple[str, str, str], torch.Tensor] = {}
+            for edge_type in graph.edge_types:
+                data = graph[edge_type]
+                if hasattr(data, "edge_attr") and data.edge_attr is not None:
+                    edge_attr_dict[edge_type] = data.edge_attr
+
+            # Derive user_types from user node features (influencer flag at index 4)
+            user_types = None
+            if "user" in graph.node_types and graph["user"].x.numel() > 0:
+                user_x = graph["user"].x
+                if user_x.size(1) >= 5:
+                    influencer_flag = user_x[:, 4]  # 1.0 if influencer else 0.0
+                    user_types = (influencer_flag > 0.5).long()
+
+            gnn_out = self.hetero_gnn(
+                graph.x_dict,
+                edge_index_dict,
+                edge_attr_dict=edge_attr_dict,
+                user_types=user_types,
+            )
+            gnn_features_vec = gnn_out["graph_repr"]
         
         # Combine features
         # Ensure dimensions match
-        if gnn_features.dim() > 1:
-            gnn_features = gnn_features.squeeze(0)
-        if gnn_features.dim() == 0:
-            gnn_features = gnn_features.unsqueeze(0)
+        if gnn_features_vec.dim() > 1:
+            gnn_features_vec = gnn_features_vec.squeeze(0)
+        if gnn_features_vec.dim() == 0:
+            gnn_features_vec = gnn_features_vec.unsqueeze(0)
         
         # Debug: print dimensions if mismatch
-        if nlp_features.shape[0] + gnn_features.shape[0] != self.fusion[0].in_features:
-            print(f"Warning: Dimension mismatch - NLP: {nlp_features.shape[0]}, GNN: {gnn_features.shape[0]}, Expected: {self.fusion[0].in_features}")
-        
-        combined = torch.cat([nlp_features, gnn_features])
+        if (
+            nlp_features.shape[0] + gnn_features_vec.shape[0]
+            != self.fusion[0].in_features
+        ):
+            print(
+                f"Warning: Dimension mismatch - NLP: {nlp_features.shape[0]}, "
+                f"GNN: {gnn_features_vec.shape[0]}, "
+                f"Expected: {self.fusion[0].in_features}"
+            )
+
+        combined = torch.cat([nlp_features, gnn_features_vec])
         
         if self.include_news_context and news_context is not None:
             news_context = news_context.to(self.device)

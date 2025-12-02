@@ -504,7 +504,13 @@ class GraphBuilder:
         post_targets = []  # [favourites_count, reblogs_count, replies_count]
         
         for post_id in self.post_ids:
-            row = df[df['post_id'] == post_id].iloc[0]
+            # post_ids are stored as strings; ensure consistent comparison with df['post_id']
+            mask = df['post_id'].astype(str) == str(post_id)
+            if not mask.any():
+                # Fallback: if no match (e.g., per-post slice), take the first row
+                row = df.iloc[0]
+            else:
+                row = df.loc[mask].iloc[0]
             interactions = self.parse_interactions_v2(row)
             
             # Use provided embedding if available
@@ -711,6 +717,10 @@ class GraphBuilder:
         Returns:
             List of (src_post_idx, tgt_post_idx, weight) tuples
         """
+        # If no timestamp information is available, skip temporal edges
+        if 'created_at' not in df.columns:
+            return []
+
         # Sort posts by time
         df_sorted = df.copy()
         df_sorted['created_at_parsed'] = pd.to_datetime(
