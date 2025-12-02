@@ -6,7 +6,7 @@ import re
 import string
 from typing import Dict, List, Optional
 import numpy as np
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassification
 import torch
 from textstat import flesch_reading_ease, flesch_kincaid_grade
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -41,7 +41,15 @@ class TextProcessor:
         self.model = AutoModel.from_pretrained(model_name).to(self.device)
         self.model.eval()
         self.sentiment_analyzer = SentimentIntensityAnalyzer()
-        
+
+        # Load GoEmotions model & tokenizer
+        model_name = "joeddav/distilbert-base-uncased-go-emotions-student"
+        self.emotion_tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.emotion_model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        self.emotion_model.to(self.device)
+        self.emotion_model.eval()
+
+    
     def clean_text(self, text: str) -> str:
         """Clean HTML tags and normalize text"""
         if not text:
@@ -136,6 +144,74 @@ class TextProcessor:
             'emotional_score': emotional_count / max(len(cleaned.split()), 1),
         }
     
+    def extract_emotion_features(self, text: str) -> Dict[str, float]:
+        """
+        Extract emotion features using the GoEmotions model
+        (joeddav/distilbert-base-uncased-go-emotions-student).
+
+        Returns aggregated probabilities over a few macro-emotion groups.
+        """
+        cleaned = self.clean_text(text)
+
+        # Tokenize
+        inputs = self.emotion_tokenizer(
+            cleaned,
+            return_tensors="pt",
+            truncation=True,
+            max_length=128,
+        )
+
+        # Move to device
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+        # Forward pass
+        with torch.no_grad():
+            outputs = self.emotion_model(**inputs)
+            logits = outputs.logits  # shape: [1, num_labels]
+            probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+
+        # Map id -> label -> probability
+        id2label = self.emotion_model.config.id2label
+        emotion_scores = {
+            id2label[i]: float(probs[i]) for i in range(len(probs))
+        }
+
+        # Helper to sum groups safely
+        def group_prob(labels):
+            return float(sum(emotion_scores.get(lbl, 0.0) for lbl in labels))
+
+        # Aggregate into macro emotion dimensions
+        emo_joy = group_prob(["joy", "amusement", "excitement"])
+        emo_sadness = group_prob(["sadness", "grief", "disappointment", "remorse"])
+        emo_anger = group_prob(["anger", "annoyance", "disgust"])
+        emo_fear = group_prob(["fear", "nervousness"])
+        emo_love = group_prob([
+            "love", "admiration", "caring", "gratitude",
+            "pride", "relief", "optimism", "approval",
+        ])
+        emo_surprise = group_prob(["surprise", "realization", "confusion"])
+        emo_neutral = emotion_scores.get("neutral", 0.0)
+
+        # Summary stats
+        max_emotion_score = float(max(emotion_scores.values()))
+        # entropy-like "emotional spread"
+        emo_spread = float(
+            -sum(p * (0 if p <= 0 else torch.log(torch.tensor(p))).item()
+                 for p in emotion_scores.values())
+        )
+
+        return {
+            "emo_joy": emo_joy,
+            "emo_sadness": emo_sadness,
+            "emo_anger": emo_anger,
+            "emo_fear": emo_fear,
+            "emo_love": emo_love,
+            "emo_surprise": emo_surprise,
+            "emo_neutral": emo_neutral,
+            "emo_max_score": max_emotion_score,
+            "emo_entropy": emo_spread,
+        }
+    
     def get_embeddings(self, text: str, max_length: int = 512) -> np.ndarray:
         """Get BERT embeddings for text"""
         cleaned = self.clean_text(text)
@@ -166,12 +242,14 @@ class TextProcessor:
         linguistic = self.extract_linguistic_features(text)
         sentiment = self.extract_sentiment_features(text)
         topic = self.extract_topic_features(text)
+        emotion = self.extract_emotion_features(text) 
         embeddings = self.get_embeddings(text)
         
         return {
             'linguistic': np.array(list(linguistic.values())),
             'sentiment': np.array(list(sentiment.values())),
             'topic': np.array(list(topic.values())),
+            'emotion': np.array(list(emotion.values())),
             'embeddings': embeddings,
         }
     
@@ -203,4 +281,3 @@ class TextProcessor:
             'urls': urls,
             'features': self.extract_all_features(text),
         }
-
