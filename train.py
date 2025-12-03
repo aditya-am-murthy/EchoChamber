@@ -70,10 +70,12 @@ class ViralityDataset(Dataset):
         for idx in range(len(df)):
             # Create a fresh graph builder for each post to avoid node ID conflicts
             from models.graph.graph_builder import GraphBuilder
-            single_post_builder = GraphBuilder(include_news_agencies=graph_builder.include_news_agencies)
-            graph = single_post_builder.build_pyg_graph(
+            single_post_builder = GraphBuilder(
+                include_news_agencies=graph_builder.include_news_agencies
+            )
+            # Use heterogeneous graph construction
+            graph = single_post_builder.build_hetero_graph(
                 df.iloc[[idx]],
-                node_features=None
             )
             self.graphs.append(graph)
     
@@ -319,20 +321,21 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=custom_collate_fn)
     
     # Initialize model
-    # Node features are: 6 node types (one-hot) + 1 interaction count = 7 dimensions
+    # For heterogeneous GNN, graph-level output dim is 128 (matches previous config)
     gnn_config = GNNConfig(
-        input_dim=7,  # Match graph node feature dimension
+        input_dim=7,
         hidden_dim=256,
         num_layers=3,
         output_dim=128,
         dropout=0.3,
-        use_batch_norm=False  # Disable batch norm for small graphs
+        use_batch_norm=False,
     )
-    
+
     model = IntegratedNLPGNNModel(
         gnn_config=gnn_config,
         include_news_context=args.include_news,
-        device=device
+        device=device,
+        use_hetero_gnn=True,
     ).to(device)
     
     # Loss and optimizer
